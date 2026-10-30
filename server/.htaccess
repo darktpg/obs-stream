@@ -1,0 +1,6 @@
+Options -Indexes
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(lib|bin|data-[^/]+)(/|$) - [F,L]
+    RewriteRule ^cron\.php$ - [F,L]
+</IfModule>

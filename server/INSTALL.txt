@@ -1,0 +1,21 @@
+OBS Server – Installation auf Plesk
+===================================
+
+Voraussetzungen
+- PHP 8.1 oder neuer mit curl, sodium und zip
+- Plesk "Geplante Aufgaben" (Scheduled Tasks)
+- Port 1935/TCP offen in der Firewall (Plesk Firewall und ggf. Hoster)
+- Linux x86_64 oder arm64
+
+1. Den Inhalt dieser Zip-Datei nach httpdocs hochladen (oder in einen Unterordner).
+2. Die Seite im Browser öffnen, sofort das Admin-Passwort festlegen und den Lizenzcode eingeben.
+3. In Plesk unter "Geplante Aufgaben" eine Aufgabe anlegen:
+   Typ "PHP-Skript ausführen", Datei cron.php, Zeitplan: jede Minute.
+   Der genaue Pfad steht im Dashboard unter "Server".
+4. Port 1935/TCP in der Firewall freigeben.
+5. Im Dashboard einen Stream anlegen und die Daten in OBS eintragen.
+
+OBS-Einstellungen: H.264 und AAC, Keyframe-Intervall 1 oder 2 Sekunden.
+
+Passwort vergessen: im Datenordner data-... die Datei auth.json löschen und
+die Seite neu öffnen. Das Passwort wird dann neu festgelegt.
