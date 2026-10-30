@@ -7,7 +7,8 @@ Voraussetzungen
 - Port 1935/TCP offen in der Firewall (Plesk Firewall und ggf. Hoster)
 - Linux x86_64 oder arm64
 
-1. Den Inhalt dieser Zip-Datei nach httpdocs hochladen (oder in einen Unterordner).
+1. Die Zip-Datei im Plesk-Dateimanager nach httpdocs (oder in einen Unterordner) hochladen
+   und dort entpacken. So bleibt die versteckte Datei .htaccess erhalten.
 2. Die Seite im Browser öffnen, sofort das Admin-Passwort festlegen und den Lizenzcode eingeben.
 3. In Plesk unter "Geplante Aufgaben" eine Aufgabe anlegen:
    Typ "PHP-Skript ausführen", Datei cron.php, Zeitplan: jede Minute.

@@ -169,10 +169,17 @@ t('path traversal refused', req("hls.php?s=$id&t=$pw&f=" . urlencode('../x.mp4')
 $st = api('streams')['json']['streams'][0];
 t('live state shown', $st['online'] === true && $st['tracks'] === ['H264', 'MPEG-4 Audio']);
 t('viewer counted', $st['viewers'] === 1);
+$viewerFile = glob(glob("$app/data-*")[0] . "/viewers/$id/*")[0];
+touch($viewerFile, time() - 3600);
+req("hls.php?s=$id&t=$pw&f=main_stream.m3u8");
+t('media playlist polling keeps viewer alive', api('streams')['json']['streams'][0]['viewers'] === 1);
 
 // Keys
 api('streams.rotate', ['id' => $id, 'what' => 'publish']);
 t('rotated key invalidates old', auth('publish', $path, "key=$publishKey") === 403);
+$rotated = api('streams')['json']['streams'][0]['stream_key'];
+$currentKey = substr($rotated, strpos($rotated, '=') + 1);
+t('rotated key works', auth('publish', $path, "key=$currentKey") === 204);
 t('rotate leaves other streams connected', !is_file($kickFile));
 
 // Grace period and lock
@@ -189,7 +196,7 @@ $patch(['checked_at' => time() - 86400 * 8, 'attempted_at' => 0]);
 $r = req('api.php?action=state')['json'];
 t('grace over after 7 days', $r['license']['unlocked'] === false && $r['license']['code'] === 'grace_expired');
 t('hls locked', req("hls.php?s=$id&t=$pw&f=index.m3u8")['status'] === 403);
-t('publish locked', auth('publish', $path, 'key=' . substr(api('streams')['json']['streams'][0]['stream_key'] ?? '=', 1)) === 403);
+t('publish locked', auth('publish', $path, "key=$currentKey") === 403);
 $ctl([]);
 $patch(['attempted_at' => 0]);
 $r = req('api.php?action=state')['json'];

@@ -29,9 +29,8 @@ $url = 'http://127.0.0.1:' . $settings['hls_port'] . $upstream . $file;
 $auth = ['Authorization: Bearer ' . $settings['secret']];
 
 if (str_ends_with($file, '.m3u8')) {
-    if ($file === 'index.m3u8') {
-        Streams::touchViewer($id, ($_SERVER['REMOTE_ADDR'] ?? '') . '|' . ($_SERVER['HTTP_USER_AGENT'] ?? ''));
-    }
+    // Players fetch index.m3u8 once and then keep polling the media playlist.
+    Streams::touchViewer($id, ($_SERVER['REMOTE_ADDR'] ?? '') . '|' . ($_SERVER['HTTP_USER_AGENT'] ?? ''));
     $res = Http::request('GET', $url, ['headers' => $auth, 'timeout' => 8]);
     if ($res['status'] !== 200) {
         http_response_code($res['status'] === 404 ? 404 : 502);

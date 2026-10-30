@@ -112,7 +112,7 @@ function Details({ stream, reload, onClose }: { stream: Stream; reload: () => vo
           </TabsContent>
           <TabsContent value="view" className="flex flex-col gap-3 pt-2">
             <p className="text-xs text-muted-foreground">
-              Zweite Person: In OBS eine Quelle „Browser“ anlegen, URL einfügen, Größe 1920 × 1080. Die URL enthält
+              Zweite Person: In OBS eine Quelle „Browser“ anlegen, URL einfügen, Größe 1920 × 1080 und „Audio über OBS steuern“ aktivieren, sonst landet der Ton nicht im OBS-Mix. Die URL enthält
               das Passwort, gib sie also nur an berechtigte Personen weiter. Alternative mit oft stabilerer Wiedergabe:
               Quelle „Medienquelle“, „Lokale Datei“ deaktivieren und die Medienquellen-URL eintragen.
             </p>
