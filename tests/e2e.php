@@ -346,5 +346,21 @@ $ctl([]);
 $r = api('license.deactivate');
 t('removing the key locks', $r['json']['license']['unlocked'] === false && $r['json']['license']['code'] === 'no_key');
 
+// Config changed behind a running server, as after an update
+$dataDir = glob("$app/data-*")[0];
+file_put_contents("$dataDir/mediamtx.yml", 'x');
+file_put_contents("$dataDir/mediamtx.pid", '0');
+$stale = function () use ($app) {
+    $code = 'require ' . var_export("$app/lib/bootstrap.php", true) . '; echo Mtx::configStale() ? "yes" : "no";';
+    return shell_exec(escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg($code));
+};
+touch("$dataDir/mediamtx.yml", 2000);
+touch("$dataDir/mediamtx.pid", 2000);
+t('fresh start is not stale', $stale() === 'no');
+touch("$dataDir/mediamtx.yml", 3000);
+t('newer config is stale', $stale() === 'yes');
+unlink("$dataDir/mediamtx.pid");
+t('stopped server is not stale', $stale() === 'no');
+
 echo $fails ? "\n$fails failed\n" : "\nall passed\n";
 exit($fails ? 1 : 0);

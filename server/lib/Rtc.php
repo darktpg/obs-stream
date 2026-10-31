@@ -13,7 +13,7 @@ final class Rtc
     {
         // The key sits in the URL because Plesk setups often strip Authorization headers.
         if (!Streams::canPublish($id, $key) || !License::unlocked()) {
-            Stats::count('publish_denied');
+            Stats::count('publish_denied', $_SERVER['REMOTE_ADDR'] ?? '');
             Http::json(['error' => 'Falscher Streamschlüssel.'], 403);
         }
         $query = 's=' . rawurlencode($id) . '&key=' . rawurlencode($key) . '&f=whip';

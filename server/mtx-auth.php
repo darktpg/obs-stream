@@ -34,7 +34,7 @@ if ($action === 'publish' && in_array($protocol, ['rtmp', 'webrtc'], true) && st
         http_response_code(204);
         exit;
     }
-    Stats::count('publish_denied');
+    Stats::count('publish_denied', (string) ($req['ip'] ?? ''));
 }
 
 deny();

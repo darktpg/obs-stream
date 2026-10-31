@@ -15,8 +15,23 @@ final class Stats
     private const KEEP_SESSIONS = 500;
 
     /** Security counters are bumped from request handlers, hence a file of their own. */
-    public static function count(string $name): void
+    public static function count(string $name, string $who): void
     {
+        // A forgotten source with an old password retries every few seconds.
+        $dir = Store::path('denied');
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0770, true);
+        }
+        $mark = $dir . '/' . hash('sha256', $name . '|' . $who);
+        if (time() - (int) @filemtime($mark) < 60) {
+            return;
+        }
+        @touch($mark);
+        foreach (glob($dir . '/*') ?: [] as $file) {
+            if (time() - (int) @filemtime($file) > 120) {
+                @unlink($file);
+            }
+        }
         $day = date('Y-m-d');
         Store::update('counters', function (array $c) use ($name, $day) {
             $c['total'][$name] = ($c['total'][$name] ?? 0) + 1;
@@ -46,7 +61,8 @@ final class Stats
         if ($now - $last < self::STEP) {
             return $d;
         }
-        $dt = $last > 0 ? min($now - $last, self::GAP) : 0;
+        // After an outage the byte counters span an unknown time; that sample counts for nothing.
+        $dt = $last > 0 && $now - $last <= self::GAP ? $now - $last : 0;
         $row = ['live' => 0, 'in' => 0, 'out' => 0, 'viewer_s' => 0, 'peak_v' => 0, 'peak_kbps' => 0, 'errors' => 0, 'started' => 0];
         $viewers = $kbps = 0;
         $day = date('Y-m-d', $now);

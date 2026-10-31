@@ -71,7 +71,7 @@ function Focus({ stream, kbps, latency, onLatency }: { stream: Stream; kbps: num
           <Separator />
           <p className="text-sm font-medium">Wiedergabe hier</p>
           {playback && <Rows rows={playbackRows(playback.stats, playback.transport)} />}
-          <p className="text-xs text-muted-foreground">Dieser Monitor zählt nicht als Zuschauer. Modus hier gilt nur für diese Ansicht.</p>
+          <p className="text-xs text-muted-foreground">Über HLS zählt dieser Monitor nicht als Zuschauer, über WebRTC schon. Der Modus hier gilt nur für diese Ansicht.</p>
         </CardContent>
       </Card>
     </div>

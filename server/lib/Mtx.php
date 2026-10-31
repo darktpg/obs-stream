@@ -140,6 +140,13 @@ final class Mtx
         @unlink(Store::path('mediamtx.pid'));
     }
 
+    /** True when the config changed after the running process was started. */
+    public static function configStale(): bool
+    {
+        $pid = Store::path('mediamtx.pid');
+        return is_file($pid) && (int) @filemtime(Store::path('mediamtx.yml')) > (int) filemtime($pid);
+    }
+
     public static function restart(): ?string
     {
         self::stop();

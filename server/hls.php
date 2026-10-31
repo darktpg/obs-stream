@@ -15,7 +15,7 @@ if ($file === 'whip') {
 
 if (!Streams::canView($id, $token)) {
     if ($file === 'status') {
-        Stats::count('view_denied');
+        Stats::count('view_denied', $_SERVER['REMOTE_ADDR'] ?? '');
     }
     Http::json(['error' => 'Falsches Passwort.'], 403);
 }

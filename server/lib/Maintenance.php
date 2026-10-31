@@ -24,13 +24,19 @@ final class Maintenance
         }
         Mtx::writeConfig();
         Mtx::trimLog();
+        // An update restarts with the old code and thus the old config. Waits for a
+        // quiet moment, since a restart would cut running broadcasts.
+        $idle = !array_filter(Mtx::paths(), fn($p) => !empty($p['online']));
+        if (Mtx::running() && Mtx::configStale() && $idle) {
+            Mtx::restart();
+        }
         $error = Mtx::start();
         Store::write('maintenance', ['ran_at' => time(), 'error' => $error]);
         if ($error !== null) {
             fwrite(STDERR, $error . "\n");
         }
         // The task runs once a minute; statistics want a finer resolution.
-        for ($i = 0; $i < 5; $i++) {
+        for ($i = 0; $i < 4; $i++) {
             Stats::sample();
             sleep(10);
         }
