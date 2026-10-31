@@ -22,17 +22,19 @@ $action = (string) ($req['action'] ?? '');
 $protocol = (string) ($req['protocol'] ?? '');
 $path = (string) ($req['path'] ?? '');
 
-if ($action === 'read' && $protocol === 'hls' && in_array($req['ip'] ?? '', ['127.0.0.1', '::1'], true)) {
+// Both only listen on localhost; viewers reach them through the checks in hls.php.
+if ($action === 'read' && in_array($protocol, ['hls', 'webrtc'], true) && in_array($req['ip'] ?? '', ['127.0.0.1', '::1'], true)) {
     http_response_code(204);
     exit;
 }
 
-if ($action === 'publish' && $protocol === 'rtmp' && str_starts_with($path, Mtx::PATH_PREFIX)) {
+if ($action === 'publish' && in_array($protocol, ['rtmp', 'webrtc'], true) && str_starts_with($path, Mtx::PATH_PREFIX)) {
     parse_str((string) ($req['query'] ?? ''), $query);
     if (Streams::canPublish(substr($path, strlen(Mtx::PATH_PREFIX)), (string) ($query['key'] ?? ''))) {
         http_response_code(204);
         exit;
     }
+    Stats::count('publish_denied');
 }
 
 deny();

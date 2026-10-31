@@ -29,5 +29,10 @@ final class Maintenance
         if ($error !== null) {
             fwrite(STDERR, $error . "\n");
         }
+        // The task runs once a minute; statistics want a finer resolution.
+        for ($i = 0; $i < 5; $i++) {
+            Stats::sample();
+            sleep(10);
+        }
     }
 }

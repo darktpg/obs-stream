@@ -131,6 +131,7 @@ $id = (string) ($input['id'] ?? '');
 switch ($action) {
     case 'streams':
         $live = Mtx::paths();
+        Stats::sample($live);
         $list = array_map(fn($s) => Streams::present($s, $live, $settings), array_values(Streams::all()));
         Http::json(['streams' => $list, 'server_running' => Mtx::running()]);
 
@@ -150,18 +151,31 @@ switch ($action) {
         Streams::rename($id, $name);
         ok();
 
+    case 'streams.configure':
+        $latency = (string) ($input['latency'] ?? '');
+        $color = (string) ($input['idle_color'] ?? '');
+        if (!in_array($latency, Streams::LATENCIES, true)) {
+            fail('Unbekannter Latenzmodus.');
+        }
+        if ($color !== '' && !preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
+            fail('Die Farbe ist ungültig.');
+        }
+        Streams::configure($id, $latency, $color);
+        ok();
+
     case 'streams.rotate':
         $what = (string) ($input['what'] ?? '');
         Streams::rotate($id, $what === 'publish' ? 'publish' : 'view');
-        if ($what === 'publish') {
-            Mtx::kick(Mtx::PATH_PREFIX . $id);
-        }
+        Mtx::kick(Mtx::PATH_PREFIX . $id, $what === 'publish' ? 'publish' : 'read');
         ok();
 
     case 'streams.delete':
         Streams::delete($id);
         Mtx::kick(Mtx::PATH_PREFIX . $id);
         ok();
+
+    case 'stats':
+        Http::json(Stats::report($settings));
 
     case 'server':
         Http::json([

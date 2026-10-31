@@ -10,5 +10,7 @@ require __DIR__ . '/Auth.php';
 require __DIR__ . '/License.php';
 require __DIR__ . '/Streams.php';
 require __DIR__ . '/Mtx.php';
+require __DIR__ . '/Rtc.php';
+require __DIR__ . '/Stats.php';
 require __DIR__ . '/Updater.php';
 require __DIR__ . '/Maintenance.php';

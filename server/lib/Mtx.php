@@ -19,6 +19,9 @@ final class Mtx
     public static function config(array $s, string $log): string
     {
         $auth = rtrim($s['base_url'], '/') . '/mtx-auth.php?secret=' . $s['secret'];
+        // Browsers need to learn the public address; interface IPs are wrong behind NAT.
+        $host = $s['rtmp_host'] ?: (string) parse_url($s['base_url'], PHP_URL_HOST);
+        $hosts = $host !== '' ? '["' . $host . '"]' : '[]';
         return <<<YAML
         logLevel: warn
         logDestinations: [file]
@@ -30,7 +33,11 @@ final class Mtx
         api: true
         apiAddress: 127.0.0.1:{$s['api_port']}
         rtsp: false
-        webrtc: false
+        webrtc: true
+        webrtcAddress: 127.0.0.1:{$s['webrtc_http_port']}
+        webrtcLocalUDPAddress: :{$s['webrtc_port']}
+        webrtcLocalTCPAddress: :{$s['webrtc_port']}
+        webrtcAdditionalHosts: {$hosts}
         srt: false
         moq: false
         rtmp: true
@@ -156,17 +163,35 @@ final class Mtx
         return $out;
     }
 
-    public static function version(): ?string
+    public static function info(): array
     {
-        return self::api('GET', 'info')['version'] ?? null;
+        return self::api('GET', 'info') ?? [];
     }
 
-    /** Disconnect every publisher, used when the license locks or a key is rotated. */
-    public static function kick(?string $path = null): void
+    public static function version(): ?string
     {
-        foreach (self::api('GET', 'rtmp/conns/list?itemsPerPage=1000')['items'] ?? [] as $conn) {
-            if ($path === null || ($conn['path'] ?? '') === $path) {
-                self::api('POST', 'rtmp/conns/kick/' . rawurlencode($conn['id']));
+        return self::info()['version'] ?? null;
+    }
+
+    /**
+     * Disconnect RTMP publishers and WebRTC sessions, used when the license locks or
+     * credentials change. WebRTC media bypasses hls.php, so it has to be cut off here.
+     *
+     * @param string|null $role 'publish', 'read' or null for both
+     */
+    public static function kick(?string $path = null, ?string $role = null): void
+    {
+        if ($role !== 'read') {
+            foreach (self::api('GET', 'rtmp/conns/list?itemsPerPage=1000')['items'] ?? [] as $conn) {
+                if ($path === null || ($conn['path'] ?? '') === $path) {
+                    self::api('POST', 'rtmp/conns/kick/' . rawurlencode($conn['id']));
+                }
+            }
+        }
+        foreach (self::api('GET', 'webrtc/sessions/list?itemsPerPage=1000')['items'] ?? [] as $session) {
+            if (($path === null || ($session['path'] ?? '') === $path)
+                && ($role === null || ($session['state'] ?? '') === $role)) {
+                self::api('POST', 'webrtc/sessions/kick/' . rawurlencode($session['id']));
             }
         }
     }
@@ -199,6 +224,7 @@ final class Mtx
             'php_version' => PHP_VERSION,
             'cron_command' => $cronPhp . ' ' . APP_ROOT . '/cron.php',
             'cron_file' => APP_ROOT . '/cron.php',
+            'webrtc_port' => (int) Store::settings()['webrtc_port'],
             'cron_ok' => time() - (int) (Store::read('maintenance')['ran_at'] ?? 0) < 180,
             'log' => self::logTail(),
         ];

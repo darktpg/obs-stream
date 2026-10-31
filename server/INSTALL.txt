@@ -5,6 +5,7 @@ Voraussetzungen
 - PHP 8.1 oder neuer mit curl, sodium und zip
 - Plesk "Geplante Aufgaben" (Scheduled Tasks)
 - Port 1935/TCP offen in der Firewall (Plesk Firewall und ggf. Hoster)
+- Port 8189/UDP und 8189/TCP offen, wenn der Modus "Sofort" genutzt werden soll
 - Linux x86_64 oder arm64
 
 1. Die Zip-Datei im Plesk-Dateimanager nach httpdocs (oder in einen Unterordner) hochladen
@@ -13,10 +14,17 @@ Voraussetzungen
 3. In Plesk unter "Geplante Aufgaben" eine Aufgabe anlegen:
    Typ "PHP-Skript ausführen", Datei cron.php, Zeitplan: jede Minute.
    Der genaue Pfad steht im Dashboard unter "Server".
-4. Port 1935/TCP in der Firewall freigeben.
+4. Port 1935/TCP sowie 8189/UDP und 8189/TCP in der Firewall freigeben.
 5. Im Dashboard einen Stream anlegen und die Daten in OBS eintragen.
 
-OBS-Einstellungen: H.264 und AAC, Keyframe-Intervall 1 oder 2 Sekunden.
+OBS-Einstellungen
+- Modus "Sofort" (unter einer Sekunde): Dienst "WHIP" mit der WHIP-URL aus dem Dashboard,
+  Bearer-Token leer, Keyframe-Intervall 1 Sekunde. Nur so bleibt der Ton erhalten, denn
+  WebRTC kann kein AAC und keine B-Frames. Das Dashboard warnt pro Stream, wenn das nicht passt.
+- Alle anderen Modi: RTMP mit H.264 und AAC, Keyframe-Intervall 1 Sekunde (Niedrig) oder 2 Sekunden.
+
+Browserquelle ohne laufenden Stream: vollständig transparent. Zum Testen lässt sich im Dashboard
+unter Stream > Verwalten > Wiedergabe eine Farbe setzen, oder einmalig per URL mit &bg=00ff00.
 
 Passwort vergessen: im Datenordner data-... die Datei auth.json löschen und
 die Seite neu öffnen. Das Passwort wird dann neu festgelegt.

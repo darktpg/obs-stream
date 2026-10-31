@@ -9,9 +9,16 @@ a second person embeds the stream in their OBS as a browser or media source. Not
 
 ```
 OBS --RTMP :1935--> MediaMTX --HLS on localhost--> hls.php (password) --HTTPS--> browser / OBS source
-                       |
-                       +-- mtx-auth.php decides every publish and read
+OBS --WHIP via hls.php--^  |
+                           +-- WebRTC, signaling via hls.php, media on :8189 UDP/TCP --> browser / OBS source
+                           +-- mtx-auth.php decides every publish and read
 ```
+
+Latency modes: `instant` is WebRTC and needs WHIP from OBS, because WebRTC carries neither AAC nor
+B-frames. Otherwise the player falls back to HLS. `low`, `balanced` and `quality` are hls.js presets.
+
+New top-level files never reach existing installations: the updater of the running version only
+swaps the entries it knows. Put new server code into `lib/` and dispatch it from an existing file.
 
 Installation is described in [server/INSTALL.txt](server/INSTALL.txt).
 

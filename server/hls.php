@@ -8,7 +8,15 @@ $id = (string) ($_GET['s'] ?? '');
 $token = (string) ($_GET['t'] ?? '');
 $file = (string) ($_GET['f'] ?? 'index.m3u8');
 
+// Lives here because updates from 1.0.0 only replace the files that version knows about.
+if ($file === 'whip') {
+    Rtc::whip($id, (string) ($_GET['key'] ?? ''));
+}
+
 if (!Streams::canView($id, $token)) {
+    if ($file === 'status') {
+        Stats::count('view_denied');
+    }
     Http::json(['error' => 'Falsches Passwort.'], 403);
 }
 if (!License::unlocked()) {
@@ -18,7 +26,17 @@ if (!License::unlocked()) {
 $upstream = '/' . Mtx::PATH_PREFIX . $id . '/';
 if ($file === 'status') {
     $path = Mtx::paths()[Mtx::PATH_PREFIX . $id] ?? [];
-    Http::json(['online' => !empty($path['online']), 'name' => Streams::find($id)['name']]);
+    $stream = Streams::find($id);
+    Http::json([
+        'online' => !empty($path['online']),
+        'name' => $stream['name'],
+        'latency' => $stream['latency'] ?? 'low',
+        'idle_color' => $stream['idle_color'] ?? '',
+        'instant_ready' => Streams::instantReady($path),
+    ]);
+}
+if ($file === 'whep') {
+    Rtc::whep($id, $token);
 }
 if (!preg_match('/^[A-Za-z0-9_.-]+\.(m3u8|mp4)$/', $file)) {
     Http::json(['error' => 'Ungültige Datei.'], 400);
@@ -30,14 +48,18 @@ $auth = ['Authorization: Bearer ' . $settings['secret']];
 
 if (str_ends_with($file, '.m3u8')) {
     // Players fetch index.m3u8 once and then keep polling the media playlist.
-    Streams::touchViewer($id, ($_SERVER['REMOTE_ADDR'] ?? '') . '|' . ($_SERVER['HTTP_USER_AGENT'] ?? ''));
+    // The dashboard monitor (m=1) is not an audience.
+    $monitor = isset($_GET['m']);
+    if (!$monitor) {
+        Streams::touchViewer($id, $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? '');
+    }
     $res = Http::request('GET', $url, ['headers' => $auth, 'timeout' => 8]);
     if ($res['status'] !== 200) {
         http_response_code($res['status'] === 404 ? 404 : 502);
         exit;
     }
     $link = fn(string $name) => 'hls.php?s=' . rawurlencode($id) . '&t=' . rawurlencode($token)
-        . '&f=' . rawurlencode(strtok($name, '?'));
+        . ($monitor ? '&m=1' : '') . '&f=' . rawurlencode(strtok($name, '?'));
     $out = [];
     foreach (preg_split('/\r?\n/', $res['body']) as $line) {
         if ($line !== '' && $line[0] !== '#') {

@@ -77,6 +77,6 @@ final class Store
 
     private static function settingDefaults(): array
     {
-        return ['base_url' => '', 'rtmp_host' => '', 'rtmp_port' => 1935, 'hls_port' => 18888, 'api_port' => 19997];
+        return ['base_url' => '', 'rtmp_host' => '', 'rtmp_port' => 1935, 'hls_port' => 18888, 'api_port' => 19997, 'webrtc_http_port' => 18889, 'webrtc_port' => 8189];
     }
 }

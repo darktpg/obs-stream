@@ -60,7 +60,7 @@ export function ServerPage() {
       <Card>
         <CardHeader>
           <CardTitle>Medienserver</CardTitle>
-          <CardDescription>MediaMTX {d.version ?? ""} nimmt RTMP an und remuxt ohne Transcoding.</CardDescription>
+          <CardDescription>MediaMTX {d.version ?? ""} nimmt RTMP und WHIP an und gibt beides ohne Transcoding weiter.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <ul className="flex flex-col gap-1.5">
@@ -84,7 +84,8 @@ export function ServerPage() {
           <CardTitle>Einrichtung in Plesk</CardTitle>
           <CardDescription>
             Damit der Medienserver dauerhaft läuft, lege unter „Geplante Aufgaben“ eine Aufgabe an, die jede Minute
-            läuft. Gib außerdem TCP-Port {info.settings.rtmp_port} in der Firewall frei.
+            läuft. Gib außerdem TCP-Port {info.settings.rtmp_port} sowie UDP- und TCP-Port {d.webrtc_port} in der
+            Firewall frei. Ohne den zweiten Port funktioniert der Modus „Sofort“ nicht, die Wiedergabe weicht dann auf HLS aus.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -95,8 +96,8 @@ export function ServerPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>RTMP-Adresse</CardTitle>
-          <CardDescription>Leer lassen, um die Domain des Dashboards zu verwenden.</CardDescription>
+          <CardTitle>Öffentliche Adresse</CardTitle>
+          <CardDescription>Leer lassen, um die Domain des Dashboards zu verwenden. Diese Adresse nutzt auch WebRTC, sie muss also direkt zum Server zeigen und darf nicht über einen CDN-Proxy laufen.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex flex-1 flex-col gap-1.5">

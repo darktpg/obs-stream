@@ -21,6 +21,8 @@ export type AppState = {
   license: License
 }
 
+export type Latency = "instant" | "low" | "balanced" | "quality"
+
 export type Stream = {
   id: string
   name: string
@@ -30,11 +32,88 @@ export type Stream = {
   stream_key: string
   watch_url: string
   hls_url: string
+  whep_url: string
+  whip_url: string
+  latency: Latency
+  idle_color: string
   online: boolean
   online_since: string | null
   tracks: string[]
   bytes_in: number
+  bytes_out: number
+  frames_in_error: number
   viewers: number
+  viewers_rtc: number
+  instant_ready: boolean
+  source: string | null
+  media: {
+    video: { codec: string; width: number; height: number; profile: string | null; level: string | null } | null
+    audio: { codec: string; sample_rate: number; channels: number | null } | null
+  }
+}
+
+export type StatRow = {
+  t: number
+  live: number
+  in: number
+  out: number
+  viewer_s: number
+  peak_v: number
+  peak_kbps: number
+  errors: number
+  started: number
+  unique?: number
+}
+
+export type StatSession = {
+  stream: string
+  name: string
+  start: number
+  end?: number
+  last?: number
+  bytes: number
+  peak_v: number
+  viewer_s: number
+  peak_kbps: number
+  errors: number
+  source: string | null
+  video: Stream["media"]["video"]
+  audio: Stream["media"]["audio"]
+}
+
+export type StatsReport = {
+  now: number
+  collecting_since: number | null
+  recent: { t: number; kbps: number; viewers: number }[]
+  hours: StatRow[]
+  days: StatRow[]
+  heat: Record<string, Record<string, number>>
+  clients: Record<string, number>
+  sessions: StatSession[]
+  open: StatSession[]
+  streams: { id: string; name: string; created_at: number; latency: Latency }[]
+  counters: { total: Record<string, number>; days: Record<string, Record<string, number>> }
+  server: {
+    running: boolean
+    mtx_version: string | null
+    mtx_started: string | null
+    load: number[] | null
+    cpus: number | null
+    memory: { total: number; available: number } | null
+    disk_free: number | null
+    disk_total: number | null
+    data_bytes: number
+    php_version: string
+    app_version: string
+    cron_ran_at: number | null
+    update_available: string | null
+  }
+  license: {
+    expires_at: string | number | null
+    activations: number | null
+    max_activations: number | null
+    checked_at: number | null
+  }
 }
 
 export type UpdateInfo = {
@@ -63,6 +142,7 @@ export type ServerInfo = {
     cron_command: string
     cron_file: string
     cron_ok: boolean
+    webrtc_port: number
     log: string
   }
   settings: { rtmp_host: string; rtmp_port: number; base_url: string }

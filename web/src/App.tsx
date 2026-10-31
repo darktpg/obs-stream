@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
-import { KeyRoundIcon, LogOutIcon, MonitorPlayIcon, RadioIcon, ServerIcon } from "lucide-react"
+import { lazy, Suspense, useEffect, useState } from "react"
+import { ChartColumnIcon, KeyRoundIcon, LogOutIcon, MonitorPlayIcon, RadioIcon, ServerIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -18,14 +18,19 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { loadState, post, type AppState } from "@/lib/api"
+import { cn } from "@/lib/utils"
 import { LicenseLock, Login, Setup } from "@/pages/gate"
 import { LicensePage } from "@/pages/license"
 import { ServerPage } from "@/pages/server"
-import { MonitorPage, StreamsPage } from "@/pages/streams"
+import { MonitorPage } from "@/pages/monitor"
+import { StreamsPage } from "@/pages/streams"
+
+const StatsPage = lazy(() => import("@/pages/stats").then((m) => ({ default: m.StatsPage })))
 
 const PAGES = [
   { id: "streams", label: "Streams", icon: RadioIcon },
   { id: "monitor", label: "Monitor", icon: MonitorPlayIcon },
+  { id: "stats", label: "Statistik", icon: ChartColumnIcon },
   { id: "server", label: "Server", icon: ServerIcon },
   { id: "license", label: "Lizenz & Updates", icon: KeyRoundIcon },
 ] as const
@@ -89,9 +94,14 @@ export function App() {
           <SidebarTrigger />
           <h1 className="text-sm font-medium">{PAGES.find((p) => p.id === page)?.label}</h1>
         </header>
-        <main className="mx-auto w-full max-w-5xl p-4">
+        <main className={cn("mx-auto w-full p-4", page === "monitor" || page === "stats" ? "max-w-[100rem]" : "max-w-5xl")}>
           {page === "streams" && <StreamsPage />}
           {page === "monitor" && <MonitorPage />}
+          {page === "stats" && (
+            <Suspense fallback={null}>
+              <StatsPage />
+            </Suspense>
+          )}
           {page === "server" && <ServerPage />}
           {page === "license" && <LicensePage state={state} onState={setState} />}
         </main>

@@ -45,7 +45,7 @@ serve($procs, 18100, $app, null, ['PHP_CLI_SERVER_WORKERS' => '4']);
 serve($procs, 18101, $tmp, "$repo/tests/fixtures/fake-license.php", ['CTL_FILE' => $ctlFile, 'SECRET_KEY' => $secret]);
 function startMtx(array &$procs, string $repo, string $tmp, string $kick, string $live): void
 {
-    foreach ([19997, 18888] as $port) {
+    foreach ([19997, 18888, 18889] as $port) {
         serve($procs, $port, $tmp, "$repo/tests/fixtures/fake-mtx.php", ['LIVE_ID' => $live, 'KICK_FILE' => $kick]);
     }
 }
@@ -54,7 +54,7 @@ register_shutdown_function(function () use (&$procs, $tmp) {
         proc_terminate($p);
     }
     // PHP_CLI_SERVER_WORKERS forks children that outlive their parent.
-    exec("pkill -f 'php -S 127.0.0.1:(18100|18101|19997|18888)'");
+    exec("pkill -f 'php -S 127.0.0.1:(18100|18101|19997|18888|18889)'");
     exec('rm -rf ' . escapeshellarg($tmp));
 });
 usleep(600000);
@@ -69,6 +69,24 @@ function t(string $name, bool $ok): void
 
 $jar = "$tmp/cookies";
 $csrf = '';
+function rtc(string $method, string $path, string $body = ''): array
+{
+    $headers = [];
+    $ch = curl_init('http://127.0.0.1:18100/' . $path);
+    curl_setopt_array($ch, [
+        CURLOPT_CUSTOMREQUEST => $method, CURLOPT_POSTFIELDS => $body, CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/sdp'],
+        CURLOPT_HEADERFUNCTION => function ($ch, string $line) use (&$headers) {
+            if (str_contains($line, ':')) {
+                [$k, $v] = explode(':', $line, 2);
+                $headers[strtolower($k)] = trim($v);
+            }
+            return strlen($line);
+        },
+    ]);
+    $raw = (string) curl_exec($ch);
+    return ['status' => (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE), 'body' => $raw, 'headers' => $headers];
+}
 function req(string $path, ?array $body = null, array $headers = []): array
 {
     global $jar, $csrf;
@@ -166,13 +184,60 @@ t('segment url ends in .mp4', preg_match('/f=seg1\.mp4$/m', $r['body']) === 1);
 $r = req("hls.php?s=$id&t=$pw&f=seg1.mp4");
 t('segment streamed intact', $r['status'] === 200 && strlen($r['body']) === 70000);
 t('path traversal refused', req("hls.php?s=$id&t=$pw&f=" . urlencode('../x.mp4'))['status'] === 400);
+$r = req("hls.php?s=$id&t=$pw&m=1&f=index.m3u8");
+t('monitor flag survives the playlist rewrite', str_contains($r['body'], '&m=1&f=main_stream.m3u8'));
 $st = api('streams')['json']['streams'][0];
 t('live state shown', $st['online'] === true && $st['tracks'] === ['H264', 'MPEG-4 Audio']);
-t('viewer counted', $st['viewers'] === 1);
+t('viewer counted, webrtc readers included', $st['viewers'] === 2 && $st['viewers_rtc'] === 1);
+t('media details', $st['media']['video']['height'] === 1080 && $st['media']['audio']['channels'] === 2 && $st['source'] === 'RTMP');
+t('aac stream is not instant ready', $st['instant_ready'] === false);
+
+// WebRTC signaling
+$r = rtc('POST', "hls.php?s=$id&t=wrong&f=whep", 'offer');
+t('whep refused with wrong password', $r['status'] === 403);
+$r = rtc('POST', "hls.php?s=$id&t=$pw&f=whep", 'offer');
+t('whep answered through php', $r['status'] === 201 && str_starts_with($r['body'], 'answer:offer'));
+t('whep session url stays on hls.php', str_contains($r['headers']['location'] ?? '', "/hls.php?s=$id&t=$pw&f=whep&session=11111111-"));
+$session = rtc('DELETE', substr($r['headers']['location'], strlen('http://127.0.0.1:18100/')));
+t('whep session can be closed', $session['status'] === 200 && str_contains((string) @file_get_contents("$kickFile.rtc"), 'DELETE /live/'));
+t('bad session id refused', rtc('DELETE', "hls.php?s=$id&t=$pw&f=whep&session=../../x")['status'] === 400);
+t('whip refused with wrong key', rtc('POST', "hls.php?s=$id&key=nope&f=whip", 'offer')['status'] === 403);
+$r = rtc('POST', "hls.php?s=$id&key=$publishKey&f=whip", 'offer');
+t('whip passes the key on for mtx-auth', $r['status'] === 201 && str_ends_with($r['body'], "key=$publishKey"));
+t('webrtc publish allowed with key', auth('publish', $path, "key=$publishKey", 'webrtc', '127.0.0.1') === 204);
+t('webrtc publish denied without key', auth('publish', $path, '', 'webrtc', '127.0.0.1') === 403);
+t('external webrtc read denied', auth('read', $path, '', 'webrtc') === 403);
+t('local webrtc read allowed', auth('read', $path, '', 'webrtc', '127.0.0.1') === 204);
+
+// Playback settings
+t('unknown latency refused', api('streams.configure', ['id' => $id, 'latency' => 'x', 'idle_color' => ''])['status'] === 400);
+t('bad color refused', api('streams.configure', ['id' => $id, 'latency' => 'low', 'idle_color' => 'red;'])['status'] === 400);
+api('streams.configure', ['id' => $id, 'latency' => 'instant', 'idle_color' => '#00ff00']);
+$r = req("hls.php?s=$id&t=$pw&f=status")['json'];
+t('status carries playback settings', $r['latency'] === 'instant' && $r['idle_color'] === '#00ff00' && $r['instant_ready'] === false);
+
+// Statistics
+$statsFile = glob("$app/data-*")[0] . '/stats.json';
+$rewind = function () use ($statsFile) {
+    $d = json_decode(file_get_contents($statsFile), true);
+    $d['at'] -= 30;
+    foreach ($d['open'] ?? [] as $k => $o) {
+        $d['open'][$k]['last'] -= 30;
+    }
+    file_put_contents($statsFile, json_encode($d));
+};
+api('streams');
+$rewind();
+$rep = api('stats')['json'];
+t('broadcast tracked', count($rep['open']) === 1 && $rep['open'][0]['video']['height'] === 1080 && $rep['open'][0]['source'] === 'RTMP');
+t('bytes and bitrate sampled', $rep['open'][0]['bytes'] > 0 && $rep['open'][0]['peak_kbps'] > 0);
+t('rollups written', count($rep['hours']) === 1 && count($rep['days']) === 1 && $rep['days'][0]['live'] > 0 && $rep['days'][0]['viewer_s'] > 0);
+t('heat and clients filled', count($rep['heat']) === 1 && $rep['clients']['webrtc'] > 0);
+t('denied viewer counted', req("hls.php?s=$id&t=wrong&f=status")['status'] === 403 && api('stats')['json']['counters']['total']['view_denied'] === 1);
 $viewerFile = glob(glob("$app/data-*")[0] . "/viewers/$id/*")[0];
 touch($viewerFile, time() - 3600);
 req("hls.php?s=$id&t=$pw&f=main_stream.m3u8");
-t('media playlist polling keeps viewer alive', api('streams')['json']['streams'][0]['viewers'] === 1);
+t('media playlist polling keeps viewer alive', api('streams')['json']['streams'][0]['viewers'] === 2);
 
 // Keys
 api('streams.rotate', ['id' => $id, 'what' => 'publish']);
@@ -181,6 +246,9 @@ $rotated = api('streams')['json']['streams'][0]['stream_key'];
 $currentKey = substr($rotated, strpos($rotated, '=') + 1);
 t('rotated key works', auth('publish', $path, "key=$currentKey") === 204);
 t('rotate leaves other streams connected', !is_file($kickFile));
+api('streams.rotate', ['id' => $id, 'what' => 'view']);
+t('rotating the password cuts webrtc viewers', str_contains((string) @file_get_contents($kickFile), 'webrtc/sessions/kick/ws1'));
+$pw = api('streams')['json']['streams'][0]['view_password'];
 
 // Grace period and lock
 $data = glob("$app/data-*")[0];
@@ -208,7 +276,7 @@ $ctl(['valid' => false, 'code' => 'license_revoked']);
 $patch(['checked_at' => time() - 86400, 'attempted_at' => 0]);
 $r = req('api.php?action=state')['json'];
 t('revoked license locks', $r['license']['unlocked'] === false && $r['license']['code'] === 'license_revoked');
-t('lock kicks publishers', str_contains((string) @file_get_contents($kickFile), 'conn1'));
+t('lock kicks publishers and webrtc', str_contains((string) @file_get_contents($kickFile), 'conn1') && str_contains((string) @file_get_contents($kickFile), 'ws2'));
 $ctl([]);
 $r = api('license.activate', ['key' => 'AAAA-BBBB']);
 t('re-entering the key unlocks', $r['json']['license']['unlocked'] === true);
@@ -252,12 +320,13 @@ $offer = function (string $zip, string $version, ?string $sha = null) use ($ctl)
 $r = api('update.check');
 t('up to date', ($r['json']['update']['update'] ?? null) === null);
 
+$current = trim(file_get_contents("$app/VERSION"));
 $bad = buildZip($app, $tmp, '1.0.2', true);
 $offer($bad, '1.0.2');
 $r = api('update.install');
 t('failing update reports rollback', str_contains((string) ($r['json']['error'] ?? ''), 'wiederhergestellt'));
-t('rollback restored version', trim(file_get_contents("$app/VERSION")) === '1.0.0');
-t('app works after rollback', req('health.php')['json']['version'] === '1.0.0');
+t('rollback restored version', trim(file_get_contents("$app/VERSION")) === $current);
+t('app works after rollback', req('health.php')['json']['version'] === $current);
 
 $good = buildZip($app, $tmp, '1.0.1', false);
 $offer($good, '1.0.1', str_repeat('0', 64));
